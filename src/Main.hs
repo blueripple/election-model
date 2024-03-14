@@ -59,7 +59,7 @@ templateVars =
     ]
 
 pandocTemplate ∷ K.TemplatePath
-pandocTemplate = K.FullySpecifiedTemplatePath "pandoc-templates/blueripple_basic.html"
+pandocTemplate = K.FullySpecifiedTemplatePath "../../research/pandoc-templates/blueripple_basic.html"
 
 
 main :: IO ()
