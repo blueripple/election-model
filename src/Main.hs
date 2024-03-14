@@ -19,10 +19,8 @@ where
 import qualified BlueRipple.Configuration as BR
 import qualified BlueRipple.Data.Types.Demographic as DT
 import qualified BlueRipple.Data.Types.Geographic as GT
-import qualified BlueRipple.Data.Types.Modeling as MT
 import qualified BlueRipple.Data.ACS_PUMS as ACS
 import qualified BlueRipple.Data.Small.DataFrames as BRDF
-import qualified BlueRipple.Data.Keyed as Keyed
 import qualified BlueRipple.Data.Small.Loaders as BRL
 import qualified BlueRipple.Utilities.KnitUtils as BRK
 import qualified BlueRipple.Data.CachingCore as BRCC
@@ -36,40 +34,20 @@ import qualified Knit.Report as K
 import qualified Knit.Effect.AtomicCache as KC
 import qualified Text.Pandoc.Error as Pandoc
 import qualified System.Console.CmdArgs as CmdArgs
-import qualified Colonnade as C
 
-import qualified Control.Foldl as FL
+--import qualified Control.Foldl as FL
 import Control.Lens (view, (^.))
 
 import qualified Frames as F
-import qualified Data.Vinyl as V
-import qualified Data.Vinyl.TypeLevel as V
-import qualified Data.Map.Merge.Strict as MM
-import qualified Data.Set as Set
-import qualified Frames.Melt as F
-import qualified Frames.MapReduce as FMR
-import qualified Frames.Folds as FF
-import qualified Frames.Transform as FT
-import qualified Frames.SimpleJoins as FJ
-import qualified Frames.Streamly.InCore as FSI
-import qualified Frames.Streamly.TH as FSTH
-import qualified Frames.Serialize as FS
 
 import Path (Dir, Rel)
 import qualified Path
 import qualified System.Environment as Env
 
-import qualified Stan.ModelBuilder.DesignMatrix as DM
-
 import qualified Data.Map.Strict as M
 
-import qualified Text.Printf as PF
-import qualified Graphics.Vega.VegaLite as GV
-import qualified Graphics.Vega.VegaLite.Compat as FV
 import qualified Graphics.Vega.VegaLite.Configuration as FV
-import qualified Graphics.Vega.VegaLite.JSON as VJ
 
---import Data.Monoid (Sum(getSum))
 
 templateVars ∷ Map String String
 templateVars =
@@ -108,12 +86,12 @@ main = do
         survey = MC.CESSurvey
         aggregations = [MC.WeightedAggregation MC.ContinuousBinomial]
         alphaModels = [MC.St_A_S_E_R, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_ER_StR_StER]
-    rawCES_C <- DP.cesCountedDemPresVotesByCD False
-    cpCES_C <-  DP.cachedPreppedCES (Right "model/election2/test/CESTurnoutModelDataRaw.bin") rawCES_C
-    rawCPS_C <- DP.cpsCountedTurnoutByState
-    cpCPS_C <- DP.cachedPreppedCPS (Right "model/election2/test/CPSTurnoutModelDataRaw.bin") rawCPS_C
-    cps <- K.ignoreCacheTime cpCPS_C
-    ces <- K.ignoreCacheTime cpCES_C
+--    rawCES_C <- DP.cesCountedDemPresVotesByCD False
+--    cpCES_C <-  DP.cachedPreppedCES (Right "model/election2/test/CESTurnoutModelDataRaw.bin") rawCES_C
+--    rawCPS_C <- DP.cpsCountedTurnoutByState
+--    cpCPS_C <- DP.cachedPreppedCPS (Right "model/election2/test/CPSTurnoutModelDataRaw.bin") rawCPS_C
+--    cps <- K.ignoreCacheTime cpCPS_C
+--    ces <- K.ignoreCacheTime cpCES_C
     let modelDirE = Right "model/election2/stan/"
         cacheDirE = Right "model/election2/"
 
@@ -122,9 +100,9 @@ main = do
     BRK.brNewPost modelPostPaths postInfo "Models" $ do
 
       acsA5ByState_C <- DDP.cachedACSa5ByState ACS.acs1Yr2012_21 2021
-      acsByState <- K.ignoreCacheTime acsA5ByState_C
-      let allStates = FL.fold (FL.premap (view GT.stateAbbreviation) FL.set) acsByState
-          avgACSPWDensity = FL.fold (FL.premap (view DT.pWPopPerSqMile) FL.mean) acsByState
+--      acsByState <- K.ignoreCacheTime acsA5ByState_C
+      let --allStates = FL.fold (FL.premap (view GT.stateAbbreviation) FL.set) acsByState
+--          avgACSPWDensity = FL.fold (FL.premap (view DT.pWPopPerSqMile) FL.mean) acsByState
       acsByState_C <- BRCC.retrieveOrMakeD "model/election2/acsByStatePS.bin" acsA5ByState_C $ \acsFull ->
         pure $ DP.PSData @'[GT.StateAbbreviation] . fmap F.rcast . F.filterFrame ((== DT.Citizen) . view DT.citizenC) $ acsFull
 {-      ahTResMap_C <- MR.runTurnoutModelAH @'[GT.StateAbbreviation] 2020 modelDirE cacheDirE "State" cmdLine survey
@@ -146,7 +124,7 @@ main = do
           runPrefModelAH dst gqName agg am =
             MR.runPrefModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByState_C
           runDVSModel gqName agg am = fst
-            <<$>> MR.runFullModel 2020 (MR.allCellCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) (prefConfig agg am) acsByState_C
+            <<$>> MR.runFullModel 2020 (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) (prefConfig agg am) acsByState_C
           runDVSModelAH dst gqName agg am =
             MR.runFullModelAH 2020
             (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByState_C
@@ -162,7 +140,7 @@ main = do
       stateComparisonsAHDVS_H2022 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runDVSModelAH dVSHouse2022) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       let jsonLocations = let (d, ue) = BRK.jsonLocations modelPostPaths postInfo in BRHJ.JsonLocations d ue
       turnoutStateChart <- MR.stateChart -- @[GT.StateAbbreviation, MR.ModelPr, BRDF.VAP, BRDF.BallotsCounted]
-                           jsonLocations "TComp" "Turnout Model Comparison by State" "Turnout" (FV.ViewConfig 500 500 10)
+                           jsonLocations "TComp" "Turnout Model Comparison by State" "Turnout" (FV.fixedSizeVC 500 500 10)
                            (view BRDF.vAP) (Just $ view BRDF.ballotsCountedVEP)
                            (fmap (second $ (fmap (MR.modelCIToModelPr))) stateComparisonsT
                            <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_" <>)) $ stateComparisonsAHT))
@@ -180,7 +158,7 @@ main = do
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations runTurnoutModelAH "Race" "TurnoutAH" (show . view DT.race5C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations runTurnoutModelAH "Education_Race" "TurnoutAH" srText aggregations alphaModels
 
-      prefStateChart <- MR.stateChart jsonLocations "PComp" "Pref Comparison by State" "Pref" (FV.ViewConfig 500 500 10) (view BRDF.vAP) Nothing
+      prefStateChart <- MR.stateChart jsonLocations "PComp" "Pref Comparison by State" "Pref" (FV.fixedSizeVC 500 500 10) (view BRDF.vAP) Nothing
                         (fmap (second $ (fmap (MR.modelCIToModelPr))) stateComparisonsP
                          <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_P2020" <>)) $ stateComparisonsAHP_P2020)
                          <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_H2022" <>)) $ stateComparisonsAHP_H2022)
@@ -198,7 +176,7 @@ main = do
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations (runPrefModelAH dVSPres2020) "Race" "PrefAH" (show . view DT.race5C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (runPrefModelAH dVSPres2020) "Education_Race" "PrefAH" srText aggregations alphaModels
 
-      dvsStateChart <- MR.stateChart jsonLocations "DVSComp" "DVS Comparison by State" "Pref" (FV.ViewConfig 500 500 10) (view BRDF.vAP) Nothing
+      dvsStateChart <- MR.stateChart jsonLocations "DVSComp" "DVS Comparison by State" "Pref" (FV.fixedSizeVC 500 500 10) (view BRDF.vAP) Nothing
                         (fmap (second $ (fmap (MR.modelCIToModelPr))) stateComparisonsDVS
                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_P2020" <>)) $ stateComparisonsAHDVS_P2020)
                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_H2022" <>)) $ stateComparisonsAHDVS_H2022)
