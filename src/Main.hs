@@ -24,6 +24,7 @@ import qualified BlueRipple.Data.Small.DataFrames as BRDF
 import qualified BlueRipple.Data.Small.Loaders as BRL
 import qualified BlueRipple.Utilities.KnitUtils as BRK
 import qualified BlueRipple.Data.CachingCore as BRCC
+import qualified BlueRipple.Data.LoadersCore as BRLC
 import qualified BlueRipple.Model.Demographic.DataPrep as DDP
 import qualified BlueRipple.Model.Election2.DataPrep as DP
 import qualified BlueRipple.Model.Election2.ModelCommon as MC
@@ -99,7 +100,10 @@ main = do
 
     BRK.brNewPost modelPostPaths postInfo "Models" $ do
 
-      acsA5ByState_C <- DDP.cachedACSa5ByState ACS.acs1Yr2012_21 2021
+      let (srcWindow, cachedSrc) = ACS.acs1Yr2012_22
+      acsA5ByState_C <- DDP.cachedACSa5ByState srcWindow cachedSrc 2021
+      acsByPUMA_C <- acsByPUMA
+      K.ignoreCacheTime acsByPUMA_C >>= BRLC.logFrame . F.takeRows 100 . DP.unPSData
 --      acsByState <- K.ignoreCacheTime acsA5ByState_C
       let --allStates = FL.fold (FL.premap (view GT.stateAbbreviation) FL.set) acsByState
 --          avgACSPWDensity = FL.fold (FL.premap (view DT.pWPopPerSqMile) FL.mean) acsByState
@@ -118,26 +122,28 @@ main = do
           cacheStructureF gqName = MR.CacheStructure modelDirE cacheDirE gqName "AllCells" gqName
           runTurnoutModel gqName agg am = fst <<$>> MR.runTurnoutModel 2020
             (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) acsByState_C
-          runTurnoutModelAH gqName agg am = MR.runTurnoutModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing acsByState_C
+          runTurnoutModelAH gqName agg am = MR.runTurnoutModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing acsByPUMA_C
           runPrefModel gqName agg am = fst <<$>> MR.runPrefModel 2020
-            (MR.modelCacheStructure $ cacheStructureF gqName) (prefConfig agg am) acsByState_C
+            (MR.modelCacheStructure $ cacheStructureF gqName) (prefConfig agg am) acsByPUMA_C
           runPrefModelAH dst gqName agg am =
-            MR.runPrefModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByState_C
+            MR.runPrefModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByPUMA_C
           runDVSModel gqName agg am = fst
-            <<$>> MR.runFullModel 2020 (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) (prefConfig agg am) acsByState_C
+            <<$>> MR.runFullModel 2020 (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) (prefConfig agg am) acsByPUMA_C
           runDVSModelAH dst gqName agg am =
             MR.runFullModelAH 2020
-            (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByState_C
+            (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByPUMA_C
           g f (a, b) = f b >>= pure . (a, )
           h f = traverse (g f)
-      stateComparisonsT <- MR.allModelsCompBy @'[GT.StateAbbreviation] runTurnoutModel "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
-      stateComparisonsAHT <- MR.allModelsCompBy @'[GT.StateAbbreviation] runTurnoutModelAH "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
+      stateComparisonsT <- MR.allModelsCompBy @'[GT.StateAbbreviation] runTurnoutModel "PUMA" aggregations alphaModels >>= h MR.addBallotsCountedVEP
+      stateComparisonsAHT <- MR.allModelsCompBy @'[GT.StateAbbreviation] runTurnoutModelAH "PUMA" aggregations alphaModels >>= h MR.addBallotsCountedVEP
+{-
       stateComparisonsP <- MR.allModelsCompBy @'[GT.StateAbbreviation] runPrefModel "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       stateComparisonsAHP_P2020 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModelAH dVSPres2020) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       stateComparisonsAHP_H2022 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModelAH dVSHouse2022) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       stateComparisonsDVS <- MR.allModelsCompBy @'[GT.StateAbbreviation] runDVSModel "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       stateComparisonsAHDVS_P2020 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runDVSModelAH dVSPres2020) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
       stateComparisonsAHDVS_H2022 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runDVSModelAH dVSHouse2022) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
+-}
       let jsonLocations = let (d, ue) = BRK.jsonLocations modelPostPaths postInfo in BRHJ.JsonLocations d ue
       turnoutStateChart <- MR.stateChart -- @[GT.StateAbbreviation, MR.ModelPr, BRDF.VAP, BRDF.BallotsCounted]
                            jsonLocations "TComp" "Turnout Model Comparison by State" "Turnout" (FV.fixedSizeVC 500 500 10)
@@ -158,6 +164,7 @@ main = do
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations runTurnoutModelAH "Race" "TurnoutAH" (show . view DT.race5C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations runTurnoutModelAH "Education_Race" "TurnoutAH" srText aggregations alphaModels
 
+{-
       prefStateChart <- MR.stateChart jsonLocations "PComp" "Pref Comparison by State" "Pref" (FV.fixedSizeVC 500 500 10) (view BRDF.vAP) Nothing
                         (fmap (second $ (fmap (MR.modelCIToModelPr))) stateComparisonsP
                          <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_P2020" <>)) $ stateComparisonsAHP_P2020)
@@ -195,6 +202,7 @@ main = do
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations (runDVSModelAH dVSPres2020) "Education" "DVSAH" (show . view DT.education4C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Race" "DVSAH" (show . view DT.race5C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Education_Race" "DVSAH" srText aggregations alphaModels
+-}
       pure ()
     pure ()
   pure ()
@@ -202,6 +210,13 @@ main = do
     Right namedDocs →
       K.writeAllPandocResultsWithInfoAsHtml "" namedDocs
     Left err → putTextLn $ "Pandoc Error: " <> Pandoc.renderError err
+
+acsByPUMA :: forall r . (K.KnitEffects r, BRCC.CacheEffects r) => K.Sem r (K.ActionWithCacheTime r (DP.PSData [BRDF.StateAbbreviation, GT.PUMA]))
+acsByPUMA = do
+  let (srcWindow, cachedSrc) = ACS.acs1Yr2012_22 @r
+  fmap (DP.PSData . fmap F.rcast . F.filterFrame ((== DT.Citizen) . view DT.citizenC)) <$> DDP.cachedACSa5ByPUMA srcWindow cachedSrc 2022
+
+--weightedAggregation ::
 
 postDir ∷ Path.Path Rel Dir
 postDir = [Path.reldir|br-2023-electionModel/posts|]
