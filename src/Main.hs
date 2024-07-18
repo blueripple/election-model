@@ -28,6 +28,7 @@ import qualified BlueRipple.Data.LoadersCore as BRLC
 import qualified BlueRipple.Model.Demographic.DataPrep as DDP
 import qualified BlueRipple.Model.Election2.DataPrep as DP
 import qualified BlueRipple.Model.Election2.ModelCommon as MC
+import qualified BlueRipple.Model.Election2.ModelCommon2 as MC2
 import qualified BlueRipple.Model.Election2.ModelRunner as MR
 import qualified BlueRipple.Utilities.HvegaJsonData as BRHJ
 
@@ -103,7 +104,7 @@ main = do
       let (srcWindow, cachedSrc) = ACS.acs1Yr2012_22
       acsA5ByState_C <- DDP.cachedACSa5ByState srcWindow cachedSrc 2021
       acsByPUMA_C <- acsByPUMA
-      K.ignoreCacheTime acsByPUMA_C >>= BRLC.logFrame . F.takeRows 100 . DP.unPSData
+--      K.ignoreCacheTime acsByPUMA_C >>= BRLC.logFrame . F.takeRows 100 . DP.unPSData
 --      acsByState <- K.ignoreCacheTime acsA5ByState_C
       let --allStates = FL.fold (FL.premap (view GT.stateAbbreviation) FL.set) acsByState
 --          avgACSPWDensity = FL.fold (FL.premap (view DT.pWPopPerSqMile) FL.mean) acsByState
@@ -113,17 +114,21 @@ main = do
                    (MC.WeightedAggregation MC.ContinuousBinomial MC.NoAchenHur) (contramap F.rcast dmr) MC.NoPSTargets MC.St_A_S_E_R acsByState_C
       K.ignoreCacheTime ahTResMap_C >>= K.logLE K.Info . show . MC.unPSMap
 -}
-      presidentialElections_C <- BRL.presidentialElectionsWithIncumbency
-      let dVSPres2020 = DP.ElexTargetConfig "Pres" (pure mempty) 2020 presidentialElections_C
-      houseElections_C <- BRL.houseElectionsWithIncumbency
-      let dVSHouse2022 = DP.ElexTargetConfig "House" (pure mempty) 2022 houseElections_C
-      let turnoutConfig agg am = MC.TurnoutConfig survey (MC.ModelConfig agg am (contramap F.rcast dmr))
-          prefConfig agg am = MC.PrefConfig (MC.ModelConfig agg am (contramap F.rcast dmr))
+--      presidentialElections_C <- BRL.presidentialElectionsWithIncumbency
+--      let dVSPres2020 = DP.ElexTargetConfig "Pres" (pure mempty) 2020 presidentialElections_C
+--      houseElections_C <- BRL.houseElectionsWithIncumbency
+--      let dVSHouse2022 = DP.ElexTargetConfig "House" (pure mempty) 2022 houseElections_C
+      let turnoutConfig agg am = MC.ActionConfig survey (MC.ModelConfig agg am (contramap F.rcast dmr))
+--          prefConfig agg am = MC.PrefConfig (MC.ModelConfig agg am (contramap F.rcast dmr))
           cacheStructureF gqName = MR.CacheStructure modelDirE cacheDirE gqName "AllCells" gqName
-          runTurnoutModel gqName agg am = fst <<$>> MR.runTurnoutModel 2020
-            (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) acsByState_C
-          runTurnoutModelAH gqName agg am = MR.runTurnoutModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing acsByPUMA_C
-          runPrefModel gqName agg am = fst <<$>> MR.runPrefModel 2020
+          runTurnoutModel gqName agg am =
+            fst <<$>> MR.runBaseModel 2020
+            (MR.modelCacheStructure $ cacheStructureF gqName)
+            (MC2.ActionOnly MC.Vote (turnoutConfig agg am)) acsByPUMA_C
+          runTurnoutModelAH gqName agg am =
+            MR.runActionModelAH 2020 (cacheStructureF gqName)
+            MC.Vote (turnoutConfig agg am) Nothing acsByPUMA_C
+{-          runPrefModel gqName agg am = fst <<$>> MR.runPrefModel 2020
             (MR.modelCacheStructure $ cacheStructureF gqName) (prefConfig agg am) acsByPUMA_C
           runPrefModelAH dst gqName agg am =
             MR.runPrefModelAH 2020 (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByPUMA_C
@@ -132,6 +137,7 @@ main = do
           runDVSModelAH dst gqName agg am =
             MR.runFullModelAH 2020
             (cacheStructureF gqName) (turnoutConfig agg am) Nothing (prefConfig agg am) Nothing dst acsByPUMA_C
+-}
           g f (a, b) = f b >>= pure . (a, )
           h f = traverse (g f)
       stateComparisonsT <- MR.allModelsCompBy @'[GT.StateAbbreviation] runTurnoutModel "PUMA" aggregations alphaModels >>= h MR.addBallotsCountedVEP
@@ -163,6 +169,7 @@ main = do
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations runTurnoutModelAH "Education" "TurnoutAH" (show . view DT.education4C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations runTurnoutModelAH "Race" "TurnoutAH" (show . view DT.race5C) aggregations alphaModels
       MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations runTurnoutModelAH "Education_Race" "TurnoutAH" srText aggregations alphaModels
+
 
 {-
       prefStateChart <- MR.stateChart jsonLocations "PComp" "Pref Comparison by State" "Pref" (FV.fixedSizeVC 500 500 10) (view BRDF.vAP) Nothing

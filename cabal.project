@@ -1,4 +1,4 @@
-packages: ./
+packages: ./ ../../libs/model-election2 ~/DataScience/haskell-stan/haskell-stan ~/DataScience/hvega-utils
 jobs: 4
 with-compiler: ghc
 
@@ -24,12 +24,14 @@ import: ../../libs/cabal_repo_imports/data-ACS-Tables.project
 import: ../../libs/cabal_repo_imports/data-ACS-PUMS.project
 import: ../../libs/cabal_repo_imports/data-CES.project
 import: ../../libs/cabal_repo_imports/data-CPS-VS.project
+import: ../../libs/cabal_repo_imports/data-RDH-voterfiles.project
 import: ../../libs/cabal_repo_imports/data-visualizations.project
 import: ../../libs/cabal_repo_imports/model-demographic.project
-import: ../../libs/cabal_repo_imports/model-election2.project
+--import: ../../libs/cabal_repo_imports/model-election2.project
 import: ../../libs/cabal_repo_imports/model-tools.project
 --import: ../../libs/cabal_repo_imports/model-Evangelical.project
-import: ../../libs/cabal_repo_imports/haskell-stan.project
+--import: ../../libs/cabal_repo_imports/haskell-stan.project
+import: ../../libs/cabal_repo_imports/hs-cmdstan.project
 import: ../../libs/cabal_repo_imports/knit-haskell.project
 import: ../../libs/cabal_repo_imports/Frames-streamly.project
 import: ../../libs/cabal_repo_imports/Frames-serialize.project
@@ -37,7 +39,7 @@ import: ../../libs/cabal_repo_imports/Frames-utils.project
 import: ../../libs/cabal_repo_imports/Frames-hvega.project
 import: ../../libs/cabal_repo_imports/data-science-utils.project
 import: ../../libs/cabal_repo_imports/nlopt-haskell.project
-import: ../../libs/cabal_repo_imports/hvega-utils.project
+--import: ../../libs/cabal_repo_imports/hvega-utils.project
 import: ../../libs/cabal_repo_imports/map-reduce-folds.project
 import: ../../libs/cabal_repo_imports/heidi.project
 import: ../../libs/cabal_repo_imports/hTensor.project
