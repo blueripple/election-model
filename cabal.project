@@ -1,4 +1,4 @@
-packages: ./ ../../libs/model-election2 ~/DataScience/haskell-stan/haskell-stan ~/DataScience/hvega-utils
+packages: ./ ../../libs/model-election2 ~/DataScience/hvega-utils ../../libs/data-CES
 jobs: 4
 with-compiler: ghc
 
@@ -22,7 +22,7 @@ import: ../../libs/cabal_repo_imports/data-loading.project
 import: ../../libs/cabal_repo_imports/data-visualizations.project
 import: ../../libs/cabal_repo_imports/data-ACS-Tables.project
 import: ../../libs/cabal_repo_imports/data-ACS-PUMS.project
-import: ../../libs/cabal_repo_imports/data-CES.project
+--import: ../../libs/cabal_repo_imports/data-CES.project
 import: ../../libs/cabal_repo_imports/data-CPS-VS.project
 import: ../../libs/cabal_repo_imports/data-RDH-voterfiles.project
 import: ../../libs/cabal_repo_imports/data-visualizations.project
@@ -30,7 +30,7 @@ import: ../../libs/cabal_repo_imports/model-demographic.project
 --import: ../../libs/cabal_repo_imports/model-election2.project
 import: ../../libs/cabal_repo_imports/model-tools.project
 --import: ../../libs/cabal_repo_imports/model-Evangelical.project
---import: ../../libs/cabal_repo_imports/haskell-stan.project
+import: ../../libs/cabal_repo_imports/haskell-stan.project
 import: ../../libs/cabal_repo_imports/hs-cmdstan.project
 import: ../../libs/cabal_repo_imports/knit-haskell.project
 import: ../../libs/cabal_repo_imports/Frames-streamly.project
