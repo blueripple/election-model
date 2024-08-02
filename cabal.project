@@ -1,4 +1,4 @@
-packages: ./ ../../libs/model-election2 ~/DataScience/hvega-utils ../../libs/data-CES
+packages: ./ ../../libs/model-election2 ~/DataScience/hvega-utils ../../libs/data-CES ../../libs/data-types
 jobs: 4
 with-compiler: ghc
 
