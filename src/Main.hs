@@ -93,7 +93,8 @@ main = do
         cesAll = MC.CESSurvey (DP.AllSurveyed DP.Both)
         aggregations = [MC.UnweightedAggregation]
 --        aggregations = [MC.WeightedAggregation MC.ContinuousBinomial]
-        alphaModels = [MC.A_S_E_R] --, MC.St_A_S_E_R] --, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_AE_AR_ER_StR]
+        alphaModelsT = [MC.A_S_E_R, MC.A_S_E_R_AS_AE_AR_SE_SR_ER, MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER] -- [MC.A, MC.S, MC.A_S, MC.AS] --, MC.St_A_S_E_R] --, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_AE_AR_ER_StR]
+        alphaModelsP = [MC.A_S_E_R, MC.A_S_E_R_AS_AE_AR_SE_SR_ER, MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER] --, MC.St_A_S_E_R] --, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_AE_AR_ER_StR]
 --    rawCES_C <- DP.cesCountedDemPresVotesByCD False
 --    cpCES_C <-  DP.cachedPreppedCES (Right "model/election2/test/CESTurnoutModelDataRaw.bin") rawCES_C
 --    rawCPS_C <- DP.cpsCountedTurnoutByState
@@ -180,11 +181,11 @@ main = do
           g f (a, b) = f b >>= pure . (a, )
           h f = traverse (g f)
       turnoutTargets <- K.ignoreCacheTimeM $ MR.stateActionTargets 2020 MC.Vote
-      stateComparisonsACST <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModel acsByPUMA_C) "T_ACS_PUMA" aggregations alphaModels
+      stateComparisonsACST <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModel acsByPUMA_C) "T_ACS_PUMA" aggregations alphaModelsT
                               >>= h (MR.addActionTargets turnoutTargets)
-      stateComparisonsCESWT <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModel cesW_C) "T_CES_CD" aggregations alphaModels
+      stateComparisonsCESWT <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModel cesW_C) "T_CES_CD" aggregations alphaModelsT
                                >>= h (MR.addActionTargets turnoutTargets)
-      stateComparisonsAHT <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModelAH acsByPUMA_C) "AHT_ACS_PUMA" aggregations alphaModels
+      stateComparisonsAHT <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runTurnoutModelAH acsByPUMA_C) "AHT_ACS_PUMA" aggregations alphaModelsT
                              >>= h (MR.addActionTargets turnoutTargets)
 
 --      stateComparisonsAHP_H2022 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModelAH dVSHouse2022) "State" aggregations alphaModels >>= h MR.addBallotsCountedVEP
@@ -203,54 +204,77 @@ main = do
 
       _ <- K.addHvega Nothing Nothing turnoutStateChart
       let srText r = show (r ^. DT.education4C) <> "-" <> show (r ^. DT.race5C)
+          asText r = show (r ^. DT.age5C) <> "-" <> show (r ^. DT.sexC)
+          aserText r = show (r ^. DT.age5C) <> "-" <> show (r ^. DT.sexC) <> "-" <> show (r ^. DT.education4C) <> "-" <> show (r ^. DT.race5C)
 
+--      MR.allModelsCompChart  @[DT.Age5C, DT.SexC, DT.Education4C, DT.Race5C] jsonLocations (MR.turnoutDataBy @[DT.Age5C, DT.SexC, DT.Education4C, DT.Race5C]) (runTurnoutModel cesUW_C)
+--        "UW_ASER" "Turnout: UW CES" aserText aggregations alphaModels
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.turnoutDataBy @'[DT.Age5C]) (runTurnoutModel cesUW_C)
-        "UW_Age" "Turnout: UW CES" (show . view DT.age5C) aggregations alphaModels
+        "UW_Age" "Turnout: UW CES" (show . view DT.age5C) aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.SexC] jsonLocations  (MR.turnoutDataBy @'[DT.SexC]) (runTurnoutModel cesUW_C)
-        "UW_Sex" "Turnout: UW CES" (show . view DT.sexC) aggregations alphaModels
+        "UW_Sex" "Turnout: UW CES" (show . view DT.sexC) aggregations alphaModelsT
+      MR.allModelsCompChart @'[DT.Age5C, DT.SexC] jsonLocations  (MR.turnoutDataBy @'[DT.Age5C, DT.SexC]) (runTurnoutModel cesUW_C)
+        "UW_AgeSex" "Turnout: UW CES" asText aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations  (MR.turnoutDataBy @'[DT.Education4C]) (runTurnoutModel cesUW_C)
-        "UW_Education" "Turnout: UW CES" (show . view DT.education4C) aggregations alphaModels
+        "UW_Education" "Turnout: UW CES" (show . view DT.education4C) aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations  (MR.turnoutDataBy @'[DT.Race5C]) (runTurnoutModel $ cesUW_C)
-        "UW_Race" "Turnout: UW CES" (show . view DT.race5C) aggregations alphaModels
+        "UW_Race" "Turnout: UW CES" (show . view DT.race5C) aggregations alphaModelsT
+
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations  (MR.turnoutDataBy  @'[DT.Education4C, DT.Race5C]) (runTurnoutModel $ cesUW_C)
---        "UW_EduRace" "Turnout: Design CES" srText aggregations alphaModels
-
+--        "UW_EduRace" "Turnout: Design CES" srText aggregations alphaModelsT
+{-
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.turnoutDataBy @'[DT.Age5C]) (runTurnoutModel acsByPUMA_C)
-        "ACS_Age" "Turnout: ACS" (show . view DT.age5C) aggregations alphaModels
+        "ACS_Age" "Turnout: ACS" (show . view DT.age5C) aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.SexC] jsonLocations  (MR.turnoutDataBy @'[DT.SexC]) (runTurnoutModel acsByPUMA_C)
-        "ACS_Sex" "Turnout: ACS" (show . view DT.sexC) aggregations alphaModels
+        "ACS_Sex" "Turnout: ACS" (show . view DT.sexC) aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations  (MR.turnoutDataBy @'[DT.Education4C]) (runTurnoutModel acsByPUMA_C)
-        "ACS_Education" "Turnout: ACS" (show . view DT.education4C) aggregations alphaModels
+        "ACS_Education" "Turnout: ACS" (show . view DT.education4C) aggregations alphaModelsT
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations  (MR.turnoutDataBy @'[DT.Race5C]) (runTurnoutModel $ acsByPUMA_C)
-        "ACS_Race" "Turnout: ACS" (show . view DT.race5C) aggregations alphaModels
+        "ACS_Race" "Turnout: ACS" (show . view DT.race5C) aggregations alphaModelsT
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations  (MR.turnoutDataBy  @'[DT.Education4C, DT.Race5C]) (runTurnoutModel $ acsByPUMA_C)
---        "ACS_EduRace" "Turnout: ACS" srText aggregations alphaModels
-
+--        "ACS_EduRace" "Turnout: ACS" srText aggregations alphaModelsT
+-}
       -- voter validated subset
       cesVVByCD_C <- DP.cesCountedDemPresVotesByCD False (DP.Validated DP.Both) DP.DesignEffectWeights
                    >>= DP.cachedPreppedCES (Right "analysis/election2/cesVVByCD.bin") . fmap (F.filterFrame ((> 0) . view DP.votesInRace))
 
-      vvByCD :: [Int] <- K.ignoreCacheTime cesVVByCD_C >>= pure . fmap (view DP.votesInRace) . FL.fold FL.list
-      K.logLE K.Info $ "cesByCD (votesInRace > 0) rows=" <> show (length vvByCD)
-      K.logLE K.Info $ show vvByCD
+--      dvByCD :: [Int] <- K.ignoreCacheTime cesVVByCD_C >>= pure . fmap (view DP.dVotes) . FL.fold FL.list
+--      K.logLE K.Info $ "cesByCD (votesInRace > 0) rows=" <> show (length dvByCD)
+--      K.logLE K.Info $ show $ take 1000 dvByCD
+      vvPrefByAge <- K.ignoreCacheTime cesVVByCD_C >>= pure . FL.fold (MR.ratioFld @'[DT.Age5C] (realToFrac . view DP.dVotes) (realToFrac . view DP.votesInRace))
+      K.logLE K.Info $ "vvbyCD by Age:" <> show (FL.fold FL.list vvPrefByAge)
+      let oneCatTest a s e r x = (x ^. DT.age5C == a) && (x ^. DT.sexC == s) && (x ^. DT.education4C == e) && (x ^. DT.race5C == r)
+      vvAlphaMRatio <-  K.ignoreCacheTime cesVVByCD_C
+        >>= pure . FL.fold (MR.oneCatRatioFld (realToFrac . view DP.dVotes) (realToFrac . view DP.votesInRace) (oneCatTest DT.A5_45To64 DT.Male DT.E4_HSGrad DT.R5_WhiteNonHispanic) )
+      vvAlphaFRatio <-  K.ignoreCacheTime cesVVByCD_C
+        >>= pure . FL.fold (MR.oneCatRatioFld (realToFrac . view DP.dVotes) (realToFrac . view DP.votesInRace) (oneCatTest DT.A5_45To64 DT.Female DT.E4_HSGrad DT.R5_WhiteNonHispanic) )
+      K.logLE K.Info $ "P(alpha0 + aSex)=" <> show vvAlphaMRatio <> "; P(alpha0 - aSex)=" <> show vvAlphaFRatio
 --      cesVVUW_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVUW.bin" cesVVByCD_C
 --                  $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (realToFrac . view DP.surveyed) (view DT.pWPopPerSqMile)
 --      cesVVW_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVW.bin" cesVVByCD_C
 --                $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) ((1000 *) . view DP.surveyWeight) (view DT.pWPopPerSqMile)
 
       -- ps for turnout
-      cesVVUWV_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVUWV.bin" cesVVByCD_C
-                    $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (realToFrac . view DP.votesInRace) (view DT.pWPopPerSqMile)
+      cesVVUWV_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVUWV.bin" cesVVByCD_C $ \cesVVByCD -> do
+        K.logLE K.Info "Rebuilding cesVVUWV"
+        pure $ MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (realToFrac . view DP.votesInRace) (view DT.pWPopPerSqMile) cesVVByCD
+
+      K.ignoreCacheTime cesVVByCD_C >>= K.logLE K.Info . ("cesVVByCD rows=" <>) . show . FL.fold FL.length
+      K.ignoreCacheTime cesVVByCD_C >>= K.logLE K.Info . ("cesVVByCD N=" <>) . show .
+        FL.fold FL.list . FL.fold (MR.sumFld @'[DT.Age5C, DT.SexC] (realToFrac . view DP.votesInRace))
       K.ignoreCacheTime cesVVUWV_C >>= K.logLE K.Info . ("cesVVUWV rows=" <>) . show . FL.fold FL.length . DP.unPSData
+      K.ignoreCacheTime cesVVUWV_C >>= K.logLE K.Info . ("cesVVUWV N=" <>) . show .
+        FL.fold FL.list . FL.fold (MR.sumFld @'[DT.Age5C, DT.SexC] (realToFrac . view DT.popCount)) . DP.unPSData
       vvuwv <- K.ignoreCacheTime cesVVUWV_C >>= pure . fmap (view DT.popCount) . FL.fold FL.list . DP.unPSData
 --      K.logLE K.Info $ show $ zip (reverse vvByCD) (reverse vvuwv)
---      cesVVWV_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVWV.bin" cesVVByCD_C
---                   $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (\r -> 1000 * (r ^. DP.votedW) * realToFrac (vir2p r)) (view DT.pWPopPerSqMile)
+      cesVVWV_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVWV.bin" cesVVByCD_C
+                   $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (\r -> 1000 * realToFrac (r ^. DP.votesInRace) * r ^. DP.surveyWeight) (view DT.pWPopPerSqMile)
+
       let cesWgtd2pVotes_C = MR.surveyPSData @(GT.StateAbbreviation ': DP.DCatsR)
                              (view DP.surveyWeight) (realToFrac . view DP.votesInRace) (view DT.pWPopPerSqMile)
                              <$> cesVVByCD_C
 
-      modeledTurnoutPSMap_C <- runTurnoutModel acsByState_C "T_ACSByState" MC.UnweightedAggregation MC.St_A_S_E_R
+      modeledTurnoutPSMap_C <- runTurnoutModel acsByState_C "ACSByState" MC.UnweightedAggregation MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER
       let acs2pDeps = (,) <$> modeledTurnoutPSMap_C <*> acsByState_C
       acs2pVotes_C <- BRCC.retrieveOrMakeD "analysis/election2/acs2pVotes.bin" acs2pDeps $
         (\(mtm, acsPS) -> MR.psMapProduct (\ci pop -> round $ MT.ciMid ci * realToFrac pop) acsPS $ MC.unPSMap mtm)
@@ -264,12 +288,12 @@ main = do
           runPrefModelAH psData dst gqName agg am =
             MR.runPrefModelAH 2020 (cacheStructureF False gqName) (actionConfig agg am) Nothing (prefConfig agg am) Nothing dst psData
 
-      stateComparisonsACSP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel acs2pVotes_C) "P_ACS_Votes" aggregations alphaModels
+      stateComparisonsACSP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel acs2pVotes_C) "P_ACS_Votes" aggregations alphaModelsP
                               >>= h (MR.addPrefTargets prefTargets)
-      stateComparisonsCESP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesVVUWV_C) "P_CES_Votes" aggregations alphaModels
+      stateComparisonsCESP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesVVUWV_C) "P_CES_Votes" aggregations alphaModelsP
                               >>= h (MR.addPrefTargets prefTargets)
---      stateComparisonsCESWVP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesWV_C) "P_CESWV_PUMA" aggregations alphaModels
---                              >>= h (MR.addPrefTargets prefTargets)
+      stateComparisonsCESWVP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesVVWV_C) "P_CES_WVotes" aggregations alphaModelsP
+                              >>= h (MR.addPrefTargets prefTargets)
 --      stateComparisonsAHP_P2020 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModelAH acsByPUMA_C dVSPres2020) "AHP_ACS_PUMA" aggregations alphaModels
 --                                   >>= h (MR.addPrefTargets prefTargets)
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (MR.turnoutDataBy @'[DT.Education4C, DT.Race5C]) (runTurnoutModelAH acsByPUMA_C)
@@ -277,20 +301,25 @@ main = do
       prefStateChart <- MR.stateChart jsonLocations "PComp" "Pref Comparison by State" "Pref" (FV.fixedSizeVC 500 500 10)
                         (view DP.targetPop) (Just $ view DP.actionTarget)
                         ((fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("ACS (Modeled T) " <> )) stateComparisonsACSP)
-                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("UWV (CESVV) " <> )) stateComparisonsCESP)
---                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("CESWV_" <> )) stateComparisonsCESWVP)
+--                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("UWV (CESVV) " <> )) stateComparisonsCESP)
+                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("CESWV_" <> )) stateComparisonsCESWVP)
 --                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_P2020" <>)) $ stateComparisonsAHP_P2020)
 --                         <> (fmap (second $ (fmap (MR.modelCIToModelPr))) $ fmap (first ("AH_H2022" <>)) $ stateComparisonsAHP_H2022)
                         )
       _ <- K.addHvega Nothing Nothing prefStateChart
+--      MR.allModelsCompChart @[DT.Age5C, DT.SexC, DT.Education4C, DT.Race5C] jsonLocations (MR.prefDataBy @[DT.Age5C, DT.SexC, DT.Education4C, DT.Race5C])  (runPrefModel cesVVUWV_C)
+--        "UWV_ASER" "Pref: CES VV UWV" aserText aggregations alphaModels
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.prefDataBy @'[DT.Age5C])  (runPrefModel cesVVUWV_C)
-        "UWV_Age" "Pref: CES VV UWV" (show . view DT.age5C) aggregations alphaModels
+        "UWV_Age" "Pref: CES VV UWV" (show . view DT.age5C) aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.SexC] jsonLocations (MR.prefDataBy @'[DT.SexC]) (runPrefModel cesVVUWV_C)
-        "UWV_Sex" "Pref: CES VV UWV" (show . view DT.sexC) aggregations alphaModels
+        "UWV_Sex" "Pref: CES VV UWV" (show . view DT.sexC) aggregations alphaModelsP
+      MR.allModelsCompChart @'[DT.Age5C, DT.SexC] jsonLocations  (MR.prefDataBy @'[DT.Age5C, DT.SexC]) (runPrefModel cesVVUWV_C)
+        "UW_AgeSex" "Turnout: UW CES" asText aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations (MR.prefDataBy @'[DT.Education4C]) (runPrefModel cesVVUWV_C)
-        "UWV_Education" "Pref: CES VV UWV" (show . view DT.education4C) aggregations alphaModels
+        "UWV_Education" "Pref: CES VV UWV" (show . view DT.education4C) aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations (MR.prefDataBy @'[DT.Race5C]) (runPrefModel cesVVUWV_C)
-        "UWV_Race" "Pref: CES VV UWV" (show . view DT.race5C) aggregations alphaModels
+        "UWV_Race" "Pref: CES VV UWV" (show . view DT.race5C) aggregations alphaModelsP
+
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (MR.prefDataBy @'[DT.Education4C, DT.Race5C]) (runPrefModel cesUWV_C)
 --        "UWV_Education_Race" "Pref: CES VV UWV" srText aggregations alphaModels
 {-
@@ -305,16 +334,18 @@ main = do
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (MR.prefDataBy @'[DT.Education4C, DT.Race5C]) (runPrefModel cesW_C)
 --        "W_Education_Race" "Pref: W" srText aggregations alphaModels
 -}
+{-
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.prefDataBy @'[DT.Age5C]) (runPrefModel acsByPUMA_C)
-        "ACS_Age" "Pref: ACS" (show . view DT.age5C) aggregations alphaModels
+        "ACS_Age" "Pref: ACS" (show . view DT.age5C) aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.SexC] jsonLocations (MR.prefDataBy @'[DT.SexC]) (runPrefModel acsByPUMA_C)
-        "ACS_Sex" "Pref: ACS" (show . view DT.sexC) aggregations alphaModels
+        "ACS_Sex" "Pref: ACS" (show . view DT.sexC) aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations (MR.prefDataBy @'[DT.Education4C]) (runPrefModel acsByPUMA_C)
-        "ACS_Education" "Pref: ACS" (show . view DT.education4C) aggregations alphaModels
+        "ACS_Education" "Pref: ACS" (show . view DT.education4C) aggregations alphaModelsP
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations (MR.prefDataBy @'[DT.Race5C]) (runPrefModel acsByPUMA_C)
-        "ACS_Race" "Pref: ACS" (show . view DT.race5C) aggregations alphaModels
+        "ACS_Race" "Pref: ACS" (show . view DT.race5C) aggregations alphaModelsP
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (MR.prefDataBy @'[DT.Education4C, DT.Race5C]) (runPrefModel acsByPUMA_C)
---        "ACS_Education_Race" "Pref: ACS" srText aggregations alphaModels
+--        "ACS_Education_Race" "Pref: ACS" srText aggregations alphaModelsP
+-}
 {-
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.prefDataBy @'[DT.Age5C]) (runPrefModelAH cesVVUWV_C dVSPres2020)
         "UWV_Age" "PrefAH: UWV" (show . view DT.age5C) aggregations alphaModels
@@ -329,11 +360,11 @@ main = do
 -}
 {-
       regTargets <- K.ignoreCacheTimeM $ MR.stateActionTargets 2020 MC.Reg
-      stateComparisonsACSR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModel acsByPUMA_C) "R_ACS_PUMA" aggregations alphaModels
+      stateComparisonsACSR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModel acsByPUMA_C) "R_ACS_PUMA" aggregations alphaModelsR
                               >>= h (MR.addActionTargets regTargets)
-      stateComparisonsCESR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModel cesW_C) "R_CES_PUMA" aggregations alphaModels
+      stateComparisonsCESR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModel cesW_C) "R_CES_PUMA" aggregations alphaModelsR
                               >>= h (MR.addActionTargets regTargets)
-      stateComparisonsAHR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModelAH acsByPUMA_C) "AHR_ACS_PUMA" aggregations alphaModels
+      stateComparisonsAHR <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runRegModelAH acsByPUMA_C) "AHR_ACS_PUMA" aggregations alphaModelsR
                              >>= h (MR.addActionTargets regTargets)
       regStateChart <- MR.stateChart -- @[GT.StateAbbreviation, MR.ModelPr, BRDF.VAP, BRDF.BallotsCounted]
                        jsonLocations "RComp" "Registration Model Comparison by State" "Registration" (FV.fixedSizeVC 500 500 10)
@@ -345,15 +376,15 @@ main = do
       let srText r = show (r ^. DT.education4C) <> "-" <> show (r ^. DT.race5C)
 
       MR.allModelsCompChart @'[DT.Age5C] jsonLocations (MR.regDataBy @'[DT.Age5C]) (runRegModel $ fmap withoutDC cesUW_C)
-        "UW_Age" "Reg: UW CES" (show . view DT.age5C) aggregations alphaModels
+        "UW_Age" "Reg: UW CES" (show . view DT.age5C) aggregations alphaModelsR
       MR.allModelsCompChart @'[DT.SexC] jsonLocations  (MR.regDataBy @'[DT.SexC]) (runRegModel  $ fmap withoutDC cesUW_C)
-        "UW_Sex" "Reg: UW CES" (show . view DT.sexC) aggregations alphaModels
+        "UW_Sex" "Reg: UW CES" (show . view DT.sexC) aggregations alphaModelsR
       MR.allModelsCompChart @'[DT.Education4C] jsonLocations  (MR.regDataBy @'[DT.Education4C]) (runRegModel  $ fmap withoutDC cesUW_C)
-        "UW_Education" "Reg: UW CES" (show . view DT.education4C) aggregations alphaModels
+        "UW_Education" "Reg: UW CES" (show . view DT.education4C) aggregations alphaModelsR
       MR.allModelsCompChart @'[DT.Race5C] jsonLocations  (MR.regDataBy @'[DT.Race5C]) (runRegModel $ fmap withoutDC cesUW_C)
-        "UW_Race" "Reg: UW CES" (show . view DT.race5C) aggregations alphaModels
+        "UW_Race" "Reg: UW CES" (show . view DT.race5C) aggregations alphaModelsR
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations  (MR.regDataBy  @'[DT.Education4C, DT.Race5C]) (runRegModel $ fmap withoutDC  cesUW_C)
---        "UW_EduRace" "Turnout: Design CES" srText aggregations alphaModels
+--        "UW_EduRace" "Turnout: Design CES" srText aggregations alphaModelsR
 -}
 
 {-
@@ -365,17 +396,17 @@ main = do
 
       _ <- K.addHvega Nothing Nothing dvsStateChart
 
-      MR.allModelsCompChart @'[DT.Age5C] jsonLocations runDVSModel "Age" "DVS" (show . view DT.age5C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.SexC] jsonLocations runDVSModel "Sex" "DVS" (show . view DT.sexC) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Education4C] jsonLocations runDVSModel "Education" "DVS" (show . view DT.education4C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Race5C] jsonLocations runDVSModel "Race" "DVS" (show . view DT.race5C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations runDVSModel "Education_Race" "DVS" srText aggregations alphaModels
+      MR.allModelsCompChart @'[DT.Age5C] jsonLocations runDVSModel "Age" "DVS" (show . view DT.age5C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.SexC] jsonLocations runDVSModel "Sex" "DVS" (show . view DT.sexC) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Education4C] jsonLocations runDVSModel "Education" "DVS" (show . view DT.education4C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Race5C] jsonLocations runDVSModel "Race" "DVS" (show . view DT.race5C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations runDVSModel "Education_Race" "DVS" srText aggregations alphaModelsD
 
-      MR.allModelsCompChart @'[DT.Age5C] jsonLocations (runDVSModelAH dVSPres2020) "Age" "DVSAH" (show . view DT.age5C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.SexC] jsonLocations (runDVSModelAH dVSPres2020) "Sex" "DVSAH" (show . view DT.sexC) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Education4C] jsonLocations (runDVSModelAH dVSPres2020) "Education" "DVSAH" (show . view DT.education4C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Race" "DVSAH" (show . view DT.race5C) aggregations alphaModels
-      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Education_Race" "DVSAH" srText aggregations alphaModels
+      MR.allModelsCompChart @'[DT.Age5C] jsonLocations (runDVSModelAH dVSPres2020) "Age" "DVSAH" (show . view DT.age5C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.SexC] jsonLocations (runDVSModelAH dVSPres2020) "Sex" "DVSAH" (show . view DT.sexC) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Education4C] jsonLocations (runDVSModelAH dVSPres2020) "Education" "DVSAH" (show . view DT.education4C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Race" "DVSAH" (show . view DT.race5C) aggregations alphaModelsD
+      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (runDVSModelAH dVSPres2020) "Education_Race" "DVSAH" srText aggregations alphaModelsD
 -}
 
       pure ()
