@@ -280,8 +280,13 @@ main = do
         (\(mtm, acsPS) -> MR.psMapProduct (\ci pop -> round $ MT.ciMid ci * realToFrac pop) acsPS $ MC.unPSMap mtm)
 --        ces
 
+      cesVVByState_C <-  DP.cesCountedDemPresVotesByState False (DP.Validated DP.Both) DP.DesignEffectWeights
 --      K.ignoreCacheTime acs2pVotes_C >>= BRLC.logFrame . F.takeRows 100 . DP.unPSData
       prefTargets <- K.ignoreCacheTimeM $ MR.statePrefDTargets dVSPres2020 (cacheStructureF False "AllCells")
+      BRLC.logFrame prefTargets
+      cesImpliedPrefTargets <- K.ignoreCacheTimeM $ MR.statePrefDTargets (MR.CESImpliedDVotes cesVVByState_C)  (cacheStructureF False "AllCells")
+      BRLC.logFrame cesImpliedPrefTargets
+
       let prefConfig agg am = MC.PrefConfig (DP.Validated DP.Both) (MC.ModelConfig agg am (contramap F.rcast dmr))
           runPrefModel psData gqName agg am = fst <<$>> MR.runBaseModel 2020
             (MR.modelCacheStructure $ cacheStructureF False gqName) (MC2.PrefOnly MC.Vote $ prefConfig agg am) psData
@@ -289,11 +294,11 @@ main = do
             MR.runPrefModelAH 2020 (cacheStructureF False gqName) (actionConfig agg am) Nothing (prefConfig agg am) Nothing dst psData
 
       stateComparisonsACSP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel acs2pVotes_C) "P_ACS_Votes" aggregations alphaModelsP
-                              >>= h (MR.addPrefTargets prefTargets)
+                              >>= h (MR.addPrefTargets cesImpliedPrefTargets)
       stateComparisonsCESP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesVVUWV_C) "P_CES_Votes" aggregations alphaModelsP
-                              >>= h (MR.addPrefTargets prefTargets)
+                              >>= h (MR.addPrefTargets cesImpliedPrefTargets)
       stateComparisonsCESWVP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel cesVVWV_C) "P_CES_WVotes" aggregations alphaModelsP
-                              >>= h (MR.addPrefTargets prefTargets)
+                              >>= h (MR.addPrefTargets cesImpliedPrefTargets)
 --      stateComparisonsAHP_P2020 <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModelAH acsByPUMA_C dVSPres2020) "AHP_ACS_PUMA" aggregations alphaModels
 --                                   >>= h (MR.addPrefTargets prefTargets)
 --      MR.allModelsCompChart @'[DT.Education4C, DT.Race5C] jsonLocations (MR.turnoutDataBy @'[DT.Education4C, DT.Race5C]) (runTurnoutModelAH acsByPUMA_C)
