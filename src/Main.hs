@@ -93,7 +93,7 @@ main = do
         cesVV = MC.CESSurvey (DP.Validated DP.Both)
         cesAll = MC.CESSurvey (DP.AllSurveyed DP.Both)
 --        aggregations = [MC.RoundedWeightedAggregation]
-        agg = MC.WeightedAggregation MC.ContinuousBinomial
+        agg = MC.WeightedAggregation MC.ContinuousBinomial DP.CellWeights
         aggregations = [agg]
         alphaModelsT = [MC.A_S_E_R, MC.A_S_E_R_AS_AE_AR_SE_SR_ER, MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER] -- [MC.A, MC.S, MC.A_S, MC.AS] --, MC.St_A_S_E_R] --, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_AE_AR_ER_StR]
         alphaModelsP = [MC.A_S_E_R, MC.A_S_E_R_AS_AE_AR_SE_SR_ER, MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER] --, MC.St_A_S_E_R] --, MC.St_A_S_E_R_ER_StR, MC.St_A_S_E_R_AE_AR_ER_StR]
@@ -120,8 +120,9 @@ main = do
 
       acsByState_C <- BRCC.retrieveOrMakeD "model/election2/acsByStatePS.bin" acsA5ByState_C $ \acsFull ->
         pure $ DP.PSData @'[GT.StateAbbreviation] . fmap F.rcast . F.filterFrame ((== DT.Citizen) . view DT.citizenC) $ acsFull
-      cesByCD_C <- DP.cesCountedDemPresVotesByCD False (DP.AllSurveyed DP.Both) DP.CellWeights
+      cesByCD_C <- DP.cesCountedDemPresVotesByCD False (DP.AllSurveyed DP.Both)
                    >>= DP.cachedPreppedCES (Right "analysis/election2/cesByCD.bin")
+--      (F.takeRows 100  <$> K.ignoreCacheTime cesByCD_C) >>= BRLC.logFrame
       cesUW_C <- BRCC.retrieveOrMakeD "analysis/election2/cesUW.bin" cesByCD_C
                  $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (realToFrac . view DP.surveyed) (view DT.pWPopPerSqMile)
 
@@ -162,17 +163,17 @@ main = do
           runTurnoutModel psData gqName agg am =
             fst <<$>> MR.runBaseModel 2020
             (MR.modelCacheStructure $ cacheStructureF False gqName)
-            (MC2.ActionOnly MC.Vote ws (actionConfig agg am)) psData
+            (MC2.ActionOnly MC.Vote (actionConfig agg am)) psData
           runTurnoutModelAH psData gqName agg am =
             MR.runActionModelAH 2020 (cacheStructureF False gqName)
-            MC.Vote ws (actionConfig agg am) Nothing psData
+            MC.Vote (actionConfig agg am) Nothing psData
           runRegModel psData gqName agg am =
             fst <<$>> MR.runBaseModel 2020
             (MR.modelCacheStructure $ cacheStructureF False gqName)
-            (MC2.ActionOnly MC.Reg ws (actionConfig agg am)) psData
+            (MC2.ActionOnly MC.Reg (actionConfig agg am)) psData
           runRegModelAH psData gqName agg am =
             MR.runActionModelAH 2020 (cacheStructureF False gqName)
-            MC.Reg ws (actionConfig agg am) Nothing psData
+            MC.Reg (actionConfig agg am) Nothing psData
 
 {-          runDVSModel psData gqName agg am = fst
             <<$>> MR.runFullModel 2020 (MR.modelCacheStructure $ cacheStructureF gqName) (turnoutConfig agg am) (prefConfig agg am) psData
@@ -237,7 +238,7 @@ main = do
 --        "ACS_EduRace" "Turnout: ACS" srText aggregations alphaModelsT
 -}
       -- voter validated subset
-      cesVVByCD_C <- DP.cesCountedDemPresVotesByCD False (DP.Validated DP.Both) DP.CellWeights
+      cesVVByCD_C <- DP.cesCountedDemPresVotesByCD False (DP.Validated DP.Both)
                    >>= DP.cachedPreppedCES (Right "analysis/election2/cesVVByCD.bin") . fmap (F.filterFrame ((> 0) . view DP.votesInRace))
 
 --      dvByCD :: [Int] <- K.ignoreCacheTime cesVVByCD_C >>= pure . fmap (view DP.dVotes) . FL.fold FL.list
@@ -270,7 +271,8 @@ main = do
       vvuwv <- K.ignoreCacheTime cesVVUWV_C >>= pure . fmap (view DT.popCount) . FL.fold FL.list . DP.unPSData
 --      K.logLE K.Info $ show $ zip (reverse vvByCD) (reverse vvuwv)
       cesVVWV_C <- BRCC.retrieveOrMakeD "analysis/election2/cesVVWV.bin" cesVVByCD_C
-                   $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1) (\r -> 1000 * realToFrac (r ^. DP.votesInRace) * r ^. DP.surveyWeight) (view DT.pWPopPerSqMile)
+                   $ pure . MR.surveyPSData @'[GT.StateAbbreviation] (const 1)
+                   (\r -> 1000 * realToFrac (r ^. DP.votesInRace) * r ^. DP.surveyWeight) (view DT.pWPopPerSqMile)
 
       let cesWgtd2pVotes_C = MR.surveyPSData @(GT.StateAbbreviation ': DP.DCatsR)
                              (view DP.surveyWeight) (realToFrac . view DP.votesInRace) (view DT.pWPopPerSqMile)
@@ -282,7 +284,7 @@ main = do
         (\(mtm, acsPS) -> MR.psMapProduct (\ci pop -> round $ MT.ciMid ci * realToFrac pop) acsPS $ MC.unPSMap mtm)
 --        ces
 
-      cesVVByState_C <-  DP.cesCountedDemPresVotesByState False (DP.Validated DP.Both) DP.FullWeights
+      cesVVByState_C <-  DP.cesCountedDemPresVotesByState False (DP.Validated DP.Both)
 --      K.ignoreCacheTime acs2pVotes_C >>= BRLC.logFrame . F.takeRows 100 . DP.unPSData
       prefTargets <- K.ignoreCacheTimeM $ MR.statePrefDTargets dVSPres2020 (cacheStructureF False "AllCells")
       BRLC.logFrame prefTargets
@@ -291,9 +293,9 @@ main = do
 
       let prefConfig agg am = MC.PrefConfig (DP.Validated DP.Both) (MC.ModelConfig agg am (contramap F.rcast dmr))
           runPrefModel psData gqName agg am = fst <<$>> MR.runBaseModel 2020
-            (MR.modelCacheStructure $ cacheStructureF False gqName) (MC2.PrefOnly MC.Vote ws $ prefConfig agg am) psData
+            (MR.modelCacheStructure $ cacheStructureF False gqName) (MC2.PrefOnly MC.Vote $ prefConfig agg am) psData
           runPrefModelAH psData dst gqName agg am =
-            MR.runPrefModelAH 2020 (cacheStructureF False gqName) ws (actionConfig agg am) Nothing (prefConfig agg am) Nothing dst psData
+            MR.runPrefModelAH 2020 (cacheStructureF False gqName) (actionConfig agg am) Nothing (prefConfig agg am) Nothing dst psData
 
       stateComparisonsACSP <- MR.allModelsCompBy @'[GT.StateAbbreviation] (runPrefModel acs2pVotes_C) "P_ACS_Votes" aggregations alphaModelsP
                               >>= h (MR.addPrefTargets cesImpliedPrefTargets)
