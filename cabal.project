@@ -1,4 +1,4 @@
-packages: ./ ../../libs/model-election2 ~/DataScience/hvega-utils ../../libs/data-CES ../../libs/data-types ~/DataScience/haskell-stan/haskell-stan
+packages: ./ ../../libs/model-election2 ~/DataScience/hvega-utils ../../libs/data-CES ../../libs/data-types ~/DataScience/haskell-stan/haskell-stan ../../libs/tools-stateleg
 jobs: 4
 with-compiler: ghc
 
@@ -22,6 +22,8 @@ import: ../../libs/cabal_repo_imports/data-types.project
 import: ../../libs/cabal_repo_imports/data-tools.project
 import: ../../libs/cabal_repo_imports/data-loading.project
 import: ../../libs/cabal_repo_imports/data-visualizations.project
+import: ../../libs/cabal_repo_imports/data-DRA.project
+import: ../../libs/cabal_repo_imports/data-overlaps.project
 import: ../../libs/cabal_repo_imports/data-ACS-Tables.project
 import: ../../libs/cabal_repo_imports/data-ACS-PUMS.project
 --import: ../../libs/cabal_repo_imports/data-CES.project
