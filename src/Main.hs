@@ -21,6 +21,7 @@ import qualified BlueRipple.Data.Types.Demographic as DT
 import qualified BlueRipple.Data.Types.Geographic as GT
 import qualified BlueRipple.Data.Types.Modeling as MT
 import qualified BlueRipple.Data.ACS_PUMS as ACS
+import qualified BlueRipple.Data.ACS_Tables as BRC
 import qualified BlueRipple.Data.Small.DataFrames as BRDF
 import qualified BlueRipple.Data.Small.Loaders as BRL
 import qualified BlueRipple.Utilities.KnitUtils as BRK
@@ -32,6 +33,9 @@ import qualified BlueRipple.Model.Election2.ModelCommon as MC
 import qualified BlueRipple.Model.Election2.ModelCommon2 as MC2
 import qualified BlueRipple.Model.Election2.ModelRunner as MR
 import qualified BlueRipple.Utilities.HvegaJsonData as BRHJ
+import qualified BlueRipple.Data.Redistricting as BLR
+import qualified BlueRipple.Tools.StateLeg.Analysis as BSL
+import qualified BlueRipple.Tools.StateLeg.Visualization as BSLV
 
 import qualified Knit.Report as K
 import qualified Knit.Effect.AtomicCache as KC
@@ -87,11 +91,45 @@ main = do
           }
   resE ← K.knitHtmls knitConfig $ do
     K.logLE K.Info $ "Command Line: " <> show cmdLine
-    modelComparison cmdLine
+--    modelComparison cmdLine
+    jointComparison cmdLine "PA"
   case resE of
     Right namedDocs →
       K.writeAllPandocResultsWithInfoAsHtml "" namedDocs
     Left err → putTextLn $ "Pandoc Error: " <> Pandoc.renderError err
+
+jointComparison :: (K.KnitMany r, BRCC.CacheEffects r) => BR.CommandLine -> Text -> K.Sem r ()
+jointComparison cmdLine sa = do
+  let postInfo = BR.PostInfo (BR.postStage cmdLine) (BR.PubTimes BR.Unpublished Nothing)
+      dmr = MC.tDesignMatrixRow_d
+      agg = MC.WeightedAggregation MC.ContinuousBinomial DP.DesignEffectWeights
+      cesAll = MC.CESSurvey (DP.AllSurveyed DP.Both)
+      alphaModel = MC.St_A_S_E_R_StA_StS_StE_StR_AS_AE_AR_SE_SR_ER_StER
+      actionConfig = MC.ActionConfig cesAll (MC.ModelConfig agg alphaModel (contramap F.rcast dmr))
+      prefConfig = MC.PrefConfig (DP.Validated DP.Both) (MC.ModelConfig agg alphaModel (contramap F.rcast dmr))
+  jointCompPostPaths <- postPaths "JointComp" cmdLine
+  productPS_C <- BSL.modelC BSL.Prod actionConfig Nothing prefConfig Nothing sa
+  K.ignoreCacheTime productPS_C >>= putStrLn . show . MC.unPSMap
+  modelPS_C <- BSL.modelC BSL.Modeled actionConfig Nothing prefConfig Nothing sa
+  K.ignoreCacheTime modelPS_C >>= putStrLn . show . MC.unPSMap
+  draSLD_C <- BLR.allPassedSLD 2024 BRC.TY2021
+  upperOnlyMap <- BRL.stateUpperOnlyMap
+  singleCDMap <- BRL.stateSingleCDMap
+  let withDRA m_C d_C = flip K.wctBind ((,) <$> m_C <*> d_C)
+        $ \(model, dra) -> BSL.modelAndDRA model dra upperOnlyMap singleCDMap sa
+      productDRA_C = withDRA productPS_C draSLD_C
+      modelDRA_C = withDRA modelPS_C draSLD_C
+  products <- K.ignoreCacheTime productDRA_C
+  modeled <- K.ignoreCacheTime modelDRA_C
+  BRK.brNewPost jointCompPostPaths postInfo "JointComp" $ do
+    demoCompChart <- BSLV.modelDRAComparisonChart  jointCompPostPaths postInfo
+      "demoComp" "Joint Table Comparison" (FV.fixedSizeVC 500 500 5)
+      "Joint Table Type"
+      [BSLV.LabeledFrame "Product" products
+      ,BSLV.LabeledFrame "Modeled" modeled
+      ]
+    _ <- K.addHvega Nothing Nothing demoCompChart
+    pure ()
 
 modelComparison :: (K.KnitMany r, BRCC.CacheEffects r) => BR.CommandLine -> K.Sem r ()
 modelComparison cmdLine = do

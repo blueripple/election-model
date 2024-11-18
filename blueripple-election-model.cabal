@@ -31,8 +31,10 @@ executable blueripple-election-model
    , blueripple-data-ACS-PUMS
    , blueripple-data-ACS-Tables
    , blueripple-data-CES
+   , blueripple-data-DRA
    , blueripple-model-demographic
    , blueripple-model-election2
+   , blueripple-tools-stateleg
 --   , blueripple-model-Evangelical
    , array >= 0.5 && < 0.6
    , Frames >= 0.7 && < 0.8
